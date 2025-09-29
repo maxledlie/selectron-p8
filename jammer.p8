@@ -63,7 +63,11 @@ function _draw()
         end
     end
 
-    rect(x, y, x + width, y + height)
+    -- color: highlight the upper left or lower right when active. grey otherwise.
+    line(x, y, x + width, y, btn(Z) and 6 or 8)
+    line(x, y, x , y + height, btn(Z) and 6 or 8)
+    line(x + width, y, x + width, y + height, btn(Z) and 12 or 6)
+    line(x , y + height , x + width, y + height, btn(Z) and 12 or 6)
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
