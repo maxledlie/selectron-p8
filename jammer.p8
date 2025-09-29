@@ -33,6 +33,8 @@ function _draw()
         if (btn(RIGHT) and width > MIN_SIZE) x = x + 1
         if (btn(UP)) y = y - 1
         if (btn(DOWN) and height > MIN_SIZE) y = y + 1
+        x = x % 128
+        y = y % 128
     end
 
     if btn(Z) then
@@ -63,11 +65,60 @@ function _draw()
         end
     end
 
+    width = min(width, 127)
+    height = min(height, 127)
+
+    -- Work out "boxlet" bounds
+    -- Depending on our position there can be up to four smaller "boxlets" if we wrap around
+    -- the x and/or y boundaries.
+    local a = {
+        width = min(width, 128 - x),
+        height = min(height, 128 - y),
+        x = x,
+        y = y,
+    }
+    local b = {
+        width = width - a.width,
+        height = a.height,
+        x = 0,
+        y = y,
+    }
+    local c = {
+        width = a.width,
+        height = height - a.height,
+        x = a.x,
+        y = 0,
+    }
+    local d = {
+        width = width - a.width,
+        height = height - a.height,
+        x = 0,
+        y = 0,
+    }
+
+    -- Draw the four boxlets. Any with negative dimensions should be omitted.
+    for i, box in ipairs({ a, b, c, d }) do
+        if box.width > 0 and box.height > 0 then
+            line(box.x, box.y, box.x + box.width, box.y, btn(Z) and 6 or 8)
+            line(box.x, box.y, box.x, box.y + box.height, btn(Z) and 6 or 8)
+            line(box.x + box.width, box.y, box.x + box.width, box.y + box.height, btn(Z) and 12 or 6)
+            line(box.x , box.y + box.height , box.x + box.width, box.y + box.height, btn(Z) and 12 or 6)
+        end
+    end
+
+    -- Debug info
+    color(7)
+    print(x, 0, 0)
+    print(y, 0, 8)
+    print(width, 0, 16)
+    print(height, 0, 24)
+
+
     -- color: highlight the upper left or lower right when active. grey otherwise.
-    line(x, y, x + width, y, btn(Z) and 6 or 8)
-    line(x, y, x , y + height, btn(Z) and 6 or 8)
-    line(x + width, y, x + width, y + height, btn(Z) and 12 or 6)
-    line(x , y + height , x + width, y + height, btn(Z) and 12 or 6)
+    -- line(x, y, x + width, y, btn(Z) and 6 or 8)
+    -- line(x, y, x , y + height, btn(Z) and 6 or 8)
+    -- line(x + width, y, x + width, y + height, btn(Z) and 12 or 6)
+    -- line(x , y + height , x + width, y + height, btn(Z) and 12 or 6)
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
