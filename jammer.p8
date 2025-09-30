@@ -20,7 +20,8 @@ DT = 1. / 30.
 -- GAMEPLAY CONSTANTS
 MIN_SIZE = 2
 SPEED = 4
-TIME_LIMIT = 10
+TIME_LIMIT = 30
+LAMBDA = 0.7
 
 -- GLOBAL STATE
 x = 50
@@ -28,26 +29,24 @@ y = 50
 width = 1
 height = 1
 
-state = {
-    good_dots = {
-        { x = 52, y = 116, age = 5.00 },
-        { x = 17, y = 88, age = 4.00 },
-    },
-    bad_dots = {
-        { x = 50, y = 80, age = 2.00 },
-    },
-    score = 0,
-    time_remaining = TIME_LIMIT
-}
+state = { }
+
+-- grid size is 16x16
+-- virtual grid. dots plotted here. 
+-- at dot generation time, consult this grid.
+GRID_SIZE = 12
 
 function state_reset()
     state = {
         good_dots = {},
         bad_dots = {},
         score = 0,
-        time_remaining = TIME_LIMIT
+        game_time = 0,
+        next_spawn_time = 0
     }
 end
+
+state_reset()
 
 -- TYPES
 function box_new(x, y, width, height)
@@ -146,14 +145,68 @@ function calculate_score(boxlets)
                - 2*num_bad_selected*num_bad_selected
 end
 
+function ln(n)
+    if (n <= 0) return nil
+    local f, t = 0, 0
+    while n < 0.5 do
+    n *= 2.71828
+    t -= 1
+    end
+    while n > 1.5 do
+    n /= 2.71828
+    t += 1
+    end
+
+    n -= 1
+    for i = 9, 1, -1 do
+    f = n*(1/i - f)
+    end
+    t += f
+    -- to change base, change the
+    -- divisor below to ln(base)
+    return t
+end
+
+function get_next_spawn_time()
+    -- sample from the exponential distribution with parameter LAMBDA
+    
+    -- first sample from uniform(0, 1)
+    p = rnd(1)
+    -- transform into exponential dist.
+    res = -ln(p)/LAMBDA
+    printh("res: "..res)
+    return res
+end
+
+function spawn_dot()
+    -- Uniformly sample a random point
+    dot_x = rnd(128)
+    dot_y = rnd(128)
+    dot = { x = dot_x, y = dot_y}
+    r = flr(rnd(4))
+    printh("r: "..r)
+
+    if r == 1 then
+        add(state.bad_dots, dot)
+    else
+        add(state.good_dots, dot)
+    end
+
+    state.next_spawn_time = state.game_time + get_next_spawn_time()
+end
+
 function _draw()
-    state.time_remaining -= DT
-    if state.time_remaining <= 0 then
+    state.game_time += DT
+    if state.game_time >= TIME_LIMIT then
         if state.score > dget(0) then
             dset(0, state.score)
         end
 
         state_reset()
+    end
+
+    if state.game_time >= state.next_spawn_time then
+        spawn_dot()
     end
 
     if not btn(Z) then
@@ -253,7 +306,7 @@ function _draw()
     -- print(height, 0, 24)
     print("score: "..state.score, 1, 1)
     print("high: "..dget(0), 40, 1)
-    local display_time = max(0, flr(state.time_remaining))
+    local display_time = max(0, flr(TIME_LIMIT - state.game_time))
     print("time: "..display_time, 90, 1)
 end
 
