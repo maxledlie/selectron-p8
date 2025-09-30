@@ -18,7 +18,7 @@ DT = 1. / 30.
 -- GAMEPLAY CONSTANTS
 MIN_SIZE = 2
 SPEED = 4
-TIME_LIMIT = 30
+TIME_LIMIT = 60
 LAMBDA = 0.7
 
 -- GLOBAL STATE
@@ -41,7 +41,8 @@ function state_reset()
         bad_dots = {},
         score = 0,
         game_time = 0,
-        next_spawn_time = 0
+        next_spawn_time = 0,
+        game_over = false
     }
 end
 
@@ -213,13 +214,20 @@ function spawn_dot()
 end
 
 function _draw()
+    if state.game_over then
+        cls(0)
+        print("game over!", 40, 40)
+        print("score: "..state.score, 40, 50)
+        print("high: "..dget(0), 40, 60)
+        return
+    end
+
     state.game_time += DT
     if state.game_time >= TIME_LIMIT then
+        state.game_over = true
         if state.score > dget(0) then
             dset(0, state.score)
         end
-
-        state_reset()
     end
 
     if state.game_time >= state.next_spawn_time then
