@@ -4,6 +4,10 @@ version 42
 
 __lua__
 
+function _init()
+    cartdata("rcjam_selectron_0_0_0")
+end
+
 LEFT = 0
 RIGHT = 1
 UP = 2
@@ -11,9 +15,12 @@ DOWN = 3
 Z = 4
 X = 5
 
+DT = 1. / 30.
+
 -- GAMEPLAY CONSTANTS
 MIN_SIZE = 2
 SPEED = 4
+TIME_LIMIT = 10
 
 -- GLOBAL STATE
 x = 50
@@ -28,8 +35,19 @@ state = {
     },
     bad_dots = {
         { x = 50, y = 80, age = 2.00 },
-    }
+    },
+    score = 0,
+    time_remaining = TIME_LIMIT
 }
+
+function state_reset()
+    state = {
+        good_dots = {},
+        bad_dots = {},
+        score = 0,
+        time_remaining = TIME_LIMIT
+    }
+end
 
 -- TYPES
 function box_new(x, y, width, height)
@@ -101,7 +119,42 @@ function is_selected(x, y, boxlets)
     return false
 end
 
+function calculate_score(boxlets)
+    num_good_selected = 0
+    num_bad_selected = 0
+    good_leftover = {}
+    bad_leftover = {}
+    for i, dot in ipairs(state.good_dots) do 
+        if (is_selected(dot.x, dot.y, boxlets)) then
+            num_good_selected += 1
+        else
+            add(good_leftover, dot)
+        end
+    end
+    state.good_dots = good_leftover
+
+    for i, dot in ipairs(state.bad_dots) do 
+        if (is_selected(dot.x, dot.y, boxlets)) then
+            num_bad_selected += 1
+        else
+            add(bad_leftover, dot)
+        end
+    end
+    state.bad_dots = bad_leftover
+
+    state.score += num_good_selected*num_good_selected 
+               - 2*num_bad_selected*num_bad_selected
+end
+
 function _draw()
+    state.time_remaining -= DT
+    if state.time_remaining <= 0 then
+        if state.score > dget(0) then
+            dset(0, state.score)
+        end
+
+        state_reset()
+    end
 
     if not btn(Z) then
         if (btn(LEFT)) x = x - SPEED
@@ -187,12 +240,21 @@ function _draw()
         end
     end
 
+    -- score calculation stuff
+    if btnp(X) then
+        calculate_score(boxlets)
+    end
+
     -- Debug info
     color(7)
-    print(x, 0, 0)
-    print(y, 0, 8)
-    print(width, 0, 16)
-    print(height, 0, 24)
+    -- print(x, 0, 0)
+    -- print(y, 0, 8)
+    -- print(width, 0, 16)
+    -- print(height, 0, 24)
+    print("score: "..state.score, 1, 1)
+    print("high: "..dget(0), 40, 1)
+    local display_time = max(0, flr(state.time_remaining))
+    print("time: "..display_time, 90, 1)
 end
 
 function draw_dots()
