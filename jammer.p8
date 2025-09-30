@@ -191,7 +191,6 @@ function spawn_dot()
     index = nil
     for attempt = 1, 1000 do
         i = flr(rnd(GRID_SIZE * GRID_SIZE + 1))
-        printh("i: "..i)
         if not (state.good_dots[i] or state.bad_dots[i]) then
             index = i
             break
@@ -199,7 +198,6 @@ function spawn_dot()
     end
 
     if index == nil then
-        printh("Failed to select index")
         return
     end
 
@@ -336,11 +334,8 @@ function _draw()
 end
 
 function draw_dots()
-    printh("good dots: "..dump(state.good_dots))
     for i, _ in pairs(state.good_dots) do
-        printh("i: "..i)
         dot_x, dot_y = tile_coords(i)
-        printh("good dot at "..dot_x..", "..dot_y)
         if is_selected(dot_x, dot_y, boxlets) then
             circ(dot_x, dot_y, 6, 10)
         end
