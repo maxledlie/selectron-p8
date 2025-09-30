@@ -21,6 +21,26 @@ y = 50
 width = 1
 height = 1
 
+state = {
+    good_dots = {
+        { x = 52, y = 116, age = 5.00 },
+        { x = 17, y = 88, age = 4.00 },
+    },
+    bad_dots = {
+        { x = 50, y = 80, age = 2.00 },
+    }
+}
+
+-- TYPES
+function box_new(x, y, width, height)
+    return  {
+        x = x,
+        y = y,
+        width = width,
+        height = height
+    }
+end
+
 
 -- SEMANTICS
 --
@@ -29,8 +49,59 @@ height = 1
 --
 -- x, y refer to the top left
 
+function compute_boxlets(full_box)
+    -- Given current full box, returns x and y coordinates and dimensions of the
+    -- boxlets. There may be up to four.
+    local a = {
+        width = min(width, 128 - x),
+        height = min(height, 128 - y),
+        x = x,
+        y = y,
+    }
+
+    local b = {
+        width = width - a.width,
+        height = a.height,
+        x = 0,
+        y = y,
+    }
+
+    local c = {
+        width = a.width,
+        height = height - a.height,
+        x = a.x,
+        y = 0,
+    }
+
+    local d = {
+        width = width - a.width,
+        height = height - a.height,
+        x = 0,
+        y = 0,
+    }
+
+    ret = {}
+    for i, boxlet in ipairs({a, b, c, d}) do
+        if boxlet.width > 0 and boxlet.height > 0 then
+            add(ret, boxlet)
+        end
+    end
+    return ret
+end
+
+function is_selected(x, y, boxlets)
+    -- Returns true if a given pixel is contained in the selection box
+    for i, box in ipairs(boxlets) do 
+        if x > box.x and x < box.x + box.width and
+           y > box.y and y < box.y + box.height then
+            return true
+        end
+    end
+    
+    return false
+end
+
 function _draw()
-    cls(5)
 
     if not btn(Z) then
         if (btn(LEFT)) x = x - SPEED
@@ -73,68 +144,46 @@ function _draw()
     width = min(width, 127)
     height = min(height, 127)
 
+    full_box = box_new(x, y, width, height)
+
     -- Work out "boxlet" bounds
     -- Depending on our position there can be up to four smaller "boxlets" if we wrap around
     -- the x and/or y boundaries.
+    boxlets = compute_boxlets(full_box)
 
-    local a = {
-        width = min(width, 128 - x),
-        height = min(height, 128 - y),
-        x = x,
-        y = y,
-    }
+    -- DRAW
+    cls(5)
 
-    local b = {
-        width = width - a.width,
-        height = a.height,
-        x = 0,
-        y = y,
-    }
-
-    local c = {
-        width = a.width,
-        height = height - a.height,
-        x = a.x,
-        y = 0,
-    }
-
-    local d = {
-        width = width - a.width,
-        height = height - a.height,
-        x = 0,
-        y = 0,
-    }
+    draw_dots()
 
     -- Draw the four boxlets. Any with negative dimensions should be omitted.
-    tl_color = btn(Z) and 6 or 8
+    tl_color = btn(Z) and 6 or 9
     br_color = btn(Z) and 12 or 6
-    for i, box in ipairs({ a, b, c, d }) do
+    for i, box in ipairs(boxlets) do
         local x1 = box.x + box.width - 1
         local y1 = box.y + box.height - 1
-        if box.width > 0 and box.height > 0 then
-            if box.y ~= 0 then
-                line(box.x, box.y, x1, box.y, tl_color)
-            else
-                dashed_line_horizontal(box.x, x1, box.y, tl_color)
-            end
+        if box.y ~= 0 then
+            line(box.x, box.y, x1, box.y, tl_color)
+        else
+            dashed_line_horizontal(box.x, x1, box.y, tl_color)
+        end
 
-            if box.x ~= 0 then
-                line(box.x, box.y, box.x, y1, btn(Z) and 6 or 8)
-            else
-                dashed_line_vertical(box.y, y1, box.x, tl_color)
-            end
+        if box.x ~= 0 then
+            line(box.x, box.y, box.x, y1, tl_color)
+        else
+            dashed_line_vertical(box.y, y1, box.x, tl_color)
+        end
 
-            if x1 ~= 127 then
-                line(x1, box.y, x1, y1, btn(Z) and 12 or 6)
-            else
-                dashed_line_vertical(box.y, y1, x1, tl_color)
-            end
+        if x1 ~= 127 then
+            line(x1, box.y, x1, y1, br_color)
+        else
+            dashed_line_vertical(box.y, y1, x1, tl_color)
+        end
 
-            if y1 ~= 127 then
-                line(box.x, y1, x1, y1, br_color)
-            else
-                dashed_line_horizontal(box.x, x1, y1, br_color)
-            end
+        if y1 ~= 127 then
+            line(box.x, y1, x1, y1, br_color)
+        else
+            dashed_line_horizontal(box.x, x1, y1, br_color)
         end
     end
 
@@ -144,6 +193,21 @@ function _draw()
     print(y, 0, 8)
     print(width, 0, 16)
     print(height, 0, 24)
+end
+
+function draw_dots()
+    for i, dot in ipairs(state.good_dots) do
+        if is_selected(dot.x, dot.y, boxlets) then
+            circ(dot.x, dot.y, 6, 10)
+        end
+        circfill(dot.x, dot.y, 5, 3)
+    end
+    for i, dot in ipairs(state.bad_dots) do
+        if is_selected(dot.x, dot.y, boxlets) then
+            circ(dot.x, dot.y, 6, 10)
+        end
+        circfill(dot.x, dot.y, 5, 8)
+    end
 end
 
 function dashed_line_horizontal(x0, x1, y, color)
