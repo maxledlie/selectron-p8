@@ -1,7 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-
 version 42
-
 __lua__
 
 function _init()
@@ -34,7 +32,8 @@ state = { }
 -- grid size is 16x16
 -- virtual grid. dots plotted here. 
 -- at dot generation time, consult this grid.
-GRID_SIZE = 12
+GRID_SIZE = 8
+TILE_SIZE = 16
 
 function state_reset()
     state = {
@@ -108,6 +107,7 @@ end
 
 function is_selected(x, y, boxlets)
     -- Returns true if a given pixel is contained in the selection box
+    
     for i, box in ipairs(boxlets) do 
         if x > box.x and x < box.x + box.width and
            y > box.y and y < box.y + box.height then
@@ -118,31 +118,39 @@ function is_selected(x, y, boxlets)
     return false
 end
 
+-- given the tile number (row major), return the pixel coords
+function tile_coords(tile_index)
+    local y_ = flr(tile_index / GRID_SIZE)
+    local x_ = tile_index % GRID_SIZE
+    return (x_ + 0.5) * TILE_SIZE, (y_ + 0.5) * TILE_SIZE
+end
+
 function calculate_score(boxlets)
     num_good_selected = 0
     num_bad_selected = 0
-    good_leftover = {}
-    bad_leftover = {}
-    for i, dot in ipairs(state.good_dots) do 
-        if (is_selected(dot.x, dot.y, boxlets)) then
+    for i, _ in pairs(state.good_dots) do 
+        dot_x, dot_y = tile_coords(i)
+        if (is_selected(dot_x, dot_y, boxlets)) then
             num_good_selected += 1
-        else
-            add(good_leftover, dot)
+            state.good_dots[i] = nil
         end
     end
-    state.good_dots = good_leftover
-
-    for i, dot in ipairs(state.bad_dots) do 
-        if (is_selected(dot.x, dot.y, boxlets)) then
+    for i, _ in pairs(state.bad_dots) do 
+        dot_x, dot_y = tile_coords(i)
+        if (is_selected(dot_x, dot_y, boxlets)) then
             num_bad_selected += 1
-        else
-            add(bad_leftover, dot)
+            state.bad_dots[i] = nil
         end
     end
-    state.bad_dots = bad_leftover
 
-    state.score += num_good_selected*num_good_selected 
-               - 2*num_bad_selected*num_bad_selected
+    local score_change = num_good_selected*num_good_selected - 2*num_bad_selected*num_bad_selected
+    state.score += score_change
+
+    if score_change > 0 then
+        sfx(0)
+    else
+        sfx(1)
+    end
 end
 
 function ln(n)
@@ -174,22 +182,31 @@ function get_next_spawn_time()
     p = rnd(1)
     -- transform into exponential dist.
     res = -ln(p)/LAMBDA
-    printh("res: "..res)
     return res
 end
 
 function spawn_dot()
-    -- Uniformly sample a random point
-    dot_x = rnd(128)
-    dot_y = rnd(128)
-    dot = { x = dot_x, y = dot_y}
-    r = flr(rnd(4))
-    printh("r: "..r)
+    -- Rejection sample until we find a tile index not occupied by a good or bad dot
+    index = nil
+    for attempt = 1, 1000 do
+        i = flr(rnd(GRID_SIZE * GRID_SIZE + 1))
+        printh("i: "..i)
+        if not (state.good_dots[i] or state.bad_dots[i]) then
+            index = i
+            break
+        end
+    end
 
+    if index == nil then
+        printh("Failed to select index")
+        return
+    end
+
+    r = flr(rnd(4))
     if r == 1 then
-        add(state.bad_dots, dot)
+        state.bad_dots[index] = true
     else
-        add(state.good_dots, dot)
+        state.good_dots[index] = true
     end
 
     state.next_spawn_time = state.game_time + get_next_spawn_time()
@@ -300,10 +317,10 @@ function _draw()
 
     -- Debug info
     color(7)
-    -- print(x, 0, 0)
-    -- print(y, 0, 8)
-    -- print(width, 0, 16)
-    -- print(height, 0, 24)
+    -- print(x, 0, 8)
+    -- print(y, 0, 16)
+    -- print(width, 0, 24)
+    -- print(height, 0, 32)
     print("score: "..state.score, 1, 1)
     print("high: "..dget(0), 40, 1)
     local display_time = max(0, flr(TIME_LIMIT - state.game_time))
@@ -311,17 +328,22 @@ function _draw()
 end
 
 function draw_dots()
-    for i, dot in ipairs(state.good_dots) do
-        if is_selected(dot.x, dot.y, boxlets) then
-            circ(dot.x, dot.y, 6, 10)
+    printh("good dots: "..dump(state.good_dots))
+    for i, _ in pairs(state.good_dots) do
+        printh("i: "..i)
+        dot_x, dot_y = tile_coords(i)
+        printh("good dot at "..dot_x..", "..dot_y)
+        if is_selected(dot_x, dot_y, boxlets) then
+            circ(dot_x, dot_y, 6, 10)
         end
-        circfill(dot.x, dot.y, 5, 3)
+        circfill(dot_x, dot_y, 5, 3)
     end
-    for i, dot in ipairs(state.bad_dots) do
-        if is_selected(dot.x, dot.y, boxlets) then
-            circ(dot.x, dot.y, 6, 10)
+    for i, _ in pairs(state.bad_dots) do
+        dot_x, dot_y = tile_coords(i)
+        if is_selected(dot_x, dot_y, boxlets) then
+            circ(dot_x, dot_y, 6, 10)
         end
-        circfill(dot.x, dot.y, 5, 8)
+        circfill(dot_x, dot_y, 5, 8)
     end
 end
 
@@ -355,6 +377,19 @@ function dashed_line_vertical(y0, y1, x, color)
     line(x, y1 - r, x, min(y1 - r + DASH_SIZE, y1), color)
 end
 
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -362,3 +397,6 @@ __gfx__
 00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__sfx__
+00010000000000056002560035700457006570085700a5700b5700d570105701357016570185701b5701e5702257026570295702c5702e5703257035570375503855038550385503855000000000000000000000
+00020000000003555036550325502c550295502d5502e5502a550225501e5502155023550225501b550115500e550105500e55008550025500055000000000000000000000000000000000000000000000000000
